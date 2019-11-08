@@ -53,7 +53,7 @@ extern char *modifier_string;
 extern cairo_surface_t *img;
 extern struct moving_image *moving_img;
 double img_move_factor = 100;
-double img_move_speed = 0.00001;
+double img_move_speed = 0.00003;
 
 /* Whether the image should be tiled. */
 extern bool tile;
@@ -113,8 +113,17 @@ xcb_pixmap_t draw_image(uint32_t *resolution) {
             cairo_set_source_surface(xcb_ctx, img, 0, 0);
 	    cairo_paint(xcb_ctx);
 	    if(moving_img) {
-	      float time_interval = (float)(clock() - moving_img->move_start_time);
-	      cairo_set_source_surface(xcb_ctx, moving_img->img, moving_img->x, moving_img->y+img_move_factor*sin(img_move_speed*time_interval));
+	      float y_offset = 0;
+	      if(moving_img->moving) {
+		float time_interval = (float)(clock() - moving_img->move_start_time);
+		y_offset = img_move_factor*sin(img_move_speed*time_interval);
+		if(y_offset < 0) {
+		  y_offset = 0;
+		  moving_img->moving = false;
+		  stop_redraw_moving_image_timeout();
+		}
+	      }
+	      cairo_set_source_surface(xcb_ctx, moving_img->img, moving_img->x, moving_img->y-y_offset);
 	      cairo_paint(xcb_ctx);
 	    }
         } else {

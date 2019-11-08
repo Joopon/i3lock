@@ -12,3 +12,5 @@
     } while (0)
 
 #endif
+
+void stop_redraw_moving_image_timeout();
