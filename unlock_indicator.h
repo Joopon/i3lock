@@ -1,6 +1,8 @@
 #ifndef _UNLOCK_INDICATOR_H
 #define _UNLOCK_INDICATOR_H
 
+#include<cairo.h>
+
 typedef enum {
     STATE_STARTED = 0,           /* default state */
     STATE_KEY_PRESSED = 1,       /* key was pressed, show unlock indicator */
@@ -18,6 +20,14 @@ typedef enum {
     STATE_AUTH_WRONG = 3,         /* the password was wrong */
     STATE_I3LOCK_LOCK_FAILED = 4, /* i3lock failed to load */
 } auth_state_t;
+
+struct moving_image {
+  cairo_surface_t *img;
+  double x;
+  double y;
+  bool moving; 
+  clock_t move_start_time;
+};
 
 xcb_pixmap_t draw_image(uint32_t* resolution);
 void redraw_screen(void);

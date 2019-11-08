@@ -48,6 +48,8 @@
 #include "randr.h"
 #include "dpi.h"
 
+#include <time.h>
+
 #define TSTAMP_N_SECS(n) (n * 1.0)
 #define TSTAMP_N_MINS(n) (60 * TSTAMP_N_SECS(n))
 #define START_TIMER(timer_obj, timeout, callback) \
@@ -93,6 +95,10 @@ static uint8_t xkb_base_error;
 static int randr_base = -1;
 
 cairo_surface_t *img = NULL;
+struct moving_image *moving_img = NULL;
+const char *moving_img_path = "/home/jawa/projects/lockscreen/i3lock/testpic.png";
+static struct ev_timer *moving_img_timeout;
+
 bool tile = false;
 bool ignore_empty_password = false;
 bool skip_repeated_empty_password = false;
@@ -370,6 +376,11 @@ static void redraw_timeout(EV_P_ ev_timer *w, int revents) {
     STOP_TIMER(w);
 }
 
+static void redraw_moving_image_timeout(EV_P_ ev_timer *w, int revents) {
+    redraw_screen();
+    ev_timer_again(main_loop, w);
+}
+
 static bool skip_without_validation(void) {
     if (input_position != 0)
         return false;
@@ -533,6 +544,11 @@ static void handle_key_press(xcb_key_press_event_t *event) {
     }
 
     START_TIMER(discard_passwd_timeout, TSTAMP_N_MINS(3), discard_passwd_cb);
+
+    if(!moving_img->moving) {
+      moving_img->moving = true;
+      ev_timer_again(main_loop, moving_img_timeout);
+    }
 }
 
 /*
@@ -1214,6 +1230,24 @@ int main(int argc, char *argv[]) {
                     image_path, cairo_status_to_string(cairo_surface_status(img)));
             img = NULL;
         }
+	if(verify_png_image(moving_img_path)) {
+	  moving_img = malloc(sizeof(struct moving_image));
+	  if(moving_img != NULL) {
+	    moving_img->img = cairo_image_surface_create_from_png(moving_img_path);
+	    if (cairo_surface_status(moving_img->img) != CAIRO_STATUS_SUCCESS) {
+	      fprintf(stderr, "Could not load moving image \"%s\": %s\n",
+		      moving_img_path, cairo_status_to_string(cairo_surface_status(moving_img->img)));
+	      moving_img = NULL;
+	    }
+	    moving_img->x = 200;
+	    moving_img->y = 300;
+	    moving_img->move_start_time = clock();
+	    moving_img_timeout = calloc(sizeof(struct ev_timer), 1);
+	    ev_init(moving_img_timeout, redraw_moving_image_timeout);
+	    moving_img_timeout->repeat = TSTAMP_N_SECS(0.04);
+	  }
+	}
+
     }
 
     free(image_path);

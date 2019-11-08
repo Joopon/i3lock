@@ -51,6 +51,9 @@ extern char *modifier_string;
 
 /* A Cairo surface containing the specified image (-i), if any. */
 extern cairo_surface_t *img;
+extern struct moving_image *moving_img;
+double img_move_factor = 100;
+double img_move_speed = 0.00001;
 
 /* Whether the image should be tiled. */
 extern bool tile;
@@ -108,7 +111,12 @@ xcb_pixmap_t draw_image(uint32_t *resolution) {
     if (img) {
         if (!tile) {
             cairo_set_source_surface(xcb_ctx, img, 0, 0);
-            cairo_paint(xcb_ctx);
+	    cairo_paint(xcb_ctx);
+	    if(moving_img) {
+	      float time_interval = (float)(clock() - moving_img->move_start_time);
+	      cairo_set_source_surface(xcb_ctx, moving_img->img, moving_img->x, moving_img->y+img_move_factor*sin(img_move_speed*time_interval));
+	      cairo_paint(xcb_ctx);
+	    }
         } else {
             /* create a pattern and fill a rectangle as big as the screen */
             cairo_pattern_t *pattern;
