@@ -53,8 +53,10 @@ extern char *modifier_string;
 extern cairo_surface_t *img;
 extern struct moving_image *moving_img;
 extern int num_moving;
-double img_move_factor = 100;
-double img_move_speed = 0.00003;
+double img_jump_factor = 100;
+double img_jump_speed = 0.00003;
+double img_shake_factor = 40;
+double img_shake_speed = 0.0001;
 
 /* Whether the image should be tiled. */
 extern bool tile;
@@ -117,21 +119,39 @@ xcb_pixmap_t draw_image(uint32_t *resolution) {
 	    if(moving_img) {
 	      float curr_time = clock();
 	      for(int i=0; i<NUM_MOVING_IMG; i++) {
+		float x_offset = 0;
 		float y_offset = 0;
-		if(moving_img[i].moving) {
+		if(moving_img[i].moving == jumping) {
 		  float time_interval = curr_time - moving_img[i].move_start_time;
-		  y_offset = img_move_factor*sin(img_move_speed*time_interval);
+		  y_offset = img_jump_factor*sin(img_jump_speed*time_interval);
 		  if(y_offset < 0) {
 		    y_offset = 0;
-		    moving_img[i].moving = false;
+		    moving_img[i].moving = not_moving;
 		    num_moving--;
 		    if(num_moving <= 0) {
 		      stop_redraw_moving_image_timeout();
 		    }
 		  }
 		}
-		cairo_set_source_surface(xcb_ctx, moving_img[i].img, moving_img[i].x, moving_img[i].y-y_offset);
-	      cairo_paint(xcb_ctx);
+		if(moving_img[i].moving == shaking) {
+		  float time_interval = curr_time - moving_img[i].move_start_time;
+		  x_offset = img_shake_factor*sin(img_shake_speed*time_interval);
+		  // after one complete sinus period, stop shaking
+		  if(x_offset < 0) {
+		    moving_img[i].shaking_was_neg = true;
+		  }
+		  else if(x_offset > 0 && moving_img[i].shaking_was_neg) {
+		    x_offset = 0;
+		    moving_img[i].moving = not_moving;
+		    moving_img[i].shaking_was_neg = false;
+		    num_moving--;
+		    if(num_moving <= 0) {
+		      stop_redraw_moving_image_timeout();
+		    }
+		  }
+		}
+		cairo_set_source_surface(xcb_ctx, moving_img[i].img, moving_img[i].x-(moving_img[i].shake_direction*x_offset), moving_img[i].y-y_offset);
+		cairo_paint(xcb_ctx);
 	      }
 	    }
         } else {

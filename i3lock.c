@@ -404,7 +404,7 @@ static bool skip_without_validation(void) {
 int random_moving_image() {
   int res = rand()%NUM_MOVING_IMG;
   for(int i=0; i<=NUM_MOVING_IMG; i++) {
-    if(moving_img[res].moving) {
+    if(moving_img[res].moving != not_moving) {
       res = (res+1)%NUM_MOVING_IMG;
     }
     else {
@@ -521,6 +521,22 @@ static void handle_key_press(xcb_key_press_event_t *event) {
                 return;
             }
 
+	    // shake moving_img when BackSpace is pressed
+	    if(moving_img) {
+	      if(num_moving == 0) {
+		ev_timer_again(main_loop, moving_img_timeout);
+	      }
+	      if(num_moving < NUM_MOVING_IMG) { 
+		int rand_img = random_moving_image();
+		if(rand_img != -1) {
+		  moving_img[rand_img].shake_direction = (rand()%2)*2-1;
+		  moving_img[rand_img].moving = shaking;
+		  moving_img[rand_img].move_start_time = clock();
+		  num_moving++;
+		}
+	      }
+	    }
+
             /* decrement input_position to point to the previous glyph */
             u8_dec(password, &input_position);
             password[input_position] = '\0';
@@ -564,7 +580,7 @@ static void handle_key_press(xcb_key_press_event_t *event) {
       if(num_moving < NUM_MOVING_IMG) { 
 	int rand_img = random_moving_image();
 	if(rand_img != -1) {
-	  moving_img[rand_img].moving = true;
+	  moving_img[rand_img].moving = jumping;
 	  moving_img[rand_img].move_start_time = clock();
 	  num_moving++;
 	}
@@ -1287,7 +1303,8 @@ int main(int argc, char *argv[]) {
 	      moving_img_timeout = NULL;
 	      break;
 	    }
-	    moving_img[i].moving = false;
+	    moving_img[i].moving = not_moving;
+	    moving_img[i].shaking_was_neg = false;
 	    moving_img[i].x = moving_img_default_pos[i*2];
 	    moving_img[i].y = moving_img_default_pos[i*2+1];
 	  }

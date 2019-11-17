@@ -21,11 +21,14 @@ typedef enum {
     STATE_I3LOCK_LOCK_FAILED = 4, /* i3lock failed to load */
 } auth_state_t;
 
+enum moving_state {not_moving, jumping, shaking};
 struct moving_image {
   cairo_surface_t *img;
   double x;
   double y;
-  bool moving; 
+  enum moving_state moving;
+  int shake_direction;            /* -1 or 1 to determin shake direction */
+  bool shaking_was_neg;           /* character already moved in negative x direction */
   clock_t move_start_time;
 };
 
