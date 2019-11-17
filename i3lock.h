@@ -13,4 +13,5 @@
 
 #endif
 
+#define NUM_MOVING_IMG 3
 void stop_redraw_moving_image_timeout();

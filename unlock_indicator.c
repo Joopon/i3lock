@@ -52,6 +52,7 @@ extern char *modifier_string;
 /* A Cairo surface containing the specified image (-i), if any. */
 extern cairo_surface_t *img;
 extern struct moving_image *moving_img;
+extern int num_moving;
 double img_move_factor = 100;
 double img_move_speed = 0.00003;
 
@@ -112,19 +113,26 @@ xcb_pixmap_t draw_image(uint32_t *resolution) {
         if (!tile) {
             cairo_set_source_surface(xcb_ctx, img, 0, 0);
 	    cairo_paint(xcb_ctx);
+	    
 	    if(moving_img) {
-	      float y_offset = 0;
-	      if(moving_img->moving) {
-		float time_interval = (float)(clock() - moving_img->move_start_time);
-		y_offset = img_move_factor*sin(img_move_speed*time_interval);
-		if(y_offset < 0) {
-		  y_offset = 0;
-		  moving_img->moving = false;
-		  stop_redraw_moving_image_timeout();
+	      float curr_time = clock();
+	      for(int i=0; i<NUM_MOVING_IMG; i++) {
+		float y_offset = 0;
+		if(moving_img[i].moving) {
+		  float time_interval = curr_time - moving_img[i].move_start_time;
+		  y_offset = img_move_factor*sin(img_move_speed*time_interval);
+		  if(y_offset < 0) {
+		    y_offset = 0;
+		    moving_img[i].moving = false;
+		    num_moving--;
+		    if(num_moving <= 0) {
+		      stop_redraw_moving_image_timeout();
+		    }
+		  }
 		}
-	      }
-	      cairo_set_source_surface(xcb_ctx, moving_img->img, moving_img->x, moving_img->y-y_offset);
+		cairo_set_source_surface(xcb_ctx, moving_img[i].img, moving_img[i].x, moving_img[i].y-y_offset);
 	      cairo_paint(xcb_ctx);
+	      }
 	    }
         } else {
             /* create a pattern and fill a rectangle as big as the screen */

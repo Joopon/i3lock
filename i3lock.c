@@ -96,7 +96,13 @@ static int randr_base = -1;
 
 cairo_surface_t *img = NULL;
 struct moving_image *moving_img = NULL;
-const char *moving_img_path = "/home/jawa/projects/lockscreen/i3lock/testpic.png";
+const char *moving_img_path[NUM_MOVING_IMG] = {"/home/jawa/projects/lockscreen/i3lock/chibi_aqua.png",
+					       "/home/jawa/projects/lockscreen/i3lock/chibi_megumin.png",
+					       "/home/jawa/projects/lockscreen/i3lock/chibi_darkness.png",};
+const double moving_img_default_pos[NUM_MOVING_IMG*2] = {450, 900,
+							 950, 850,
+							 1450, 900};
+int num_moving = 0;
 static struct ev_timer *moving_img_timeout;
 
 bool tile = false;
@@ -395,6 +401,19 @@ static bool skip_without_validation(void) {
     return false;
 }
 
+int random_moving_image() {
+  int res = rand()%NUM_MOVING_IMG;
+  for(int i=0; i<=NUM_MOVING_IMG; i++) {
+    if(moving_img[res].moving) {
+      res = (res+1)%NUM_MOVING_IMG;
+    }
+    else {
+      return res;
+    }
+  }
+  return -1;
+}
+
 /*
  * Handle key presses. Fixes state, then looks up the key symbol for the
  * given keycode, then looks up the key symbol (as UCS-2), converts it to
@@ -537,10 +556,19 @@ static void handle_key_press(xcb_key_press_event_t *event) {
     input_position += n - 1;
     DEBUG("current password = %.*s\n", input_position, password);
 
-    if(!moving_img->moving) {
-      moving_img->moving = true;
-      moving_img->move_start_time = clock();
-      ev_timer_again(main_loop, moving_img_timeout);
+    // move a moving image on keypress
+    if(moving_img) {
+      if(num_moving == 0) {
+	ev_timer_again(main_loop, moving_img_timeout);
+      }
+      if(num_moving < NUM_MOVING_IMG) { 
+	int rand_img = random_moving_image();
+	if(rand_img != -1) {
+	  moving_img[rand_img].moving = true;
+	  moving_img[rand_img].move_start_time = clock();
+	  num_moving++;
+	}
+      }
     }
     
     if (unlock_indicator) {
@@ -1234,24 +1262,36 @@ int main(int argc, char *argv[]) {
                     image_path, cairo_status_to_string(cairo_surface_status(img)));
             img = NULL;
         }
-	if(verify_png_image(moving_img_path)) {
-	  moving_img = malloc(sizeof(struct moving_image));
-	  if(moving_img != NULL) {
-	    moving_img->img = cairo_image_surface_create_from_png(moving_img_path);
-	    if (cairo_surface_status(moving_img->img) != CAIRO_STATUS_SUCCESS) {
-	      fprintf(stderr, "Could not load moving image \"%s\": %s\n",
-		      moving_img_path, cairo_status_to_string(cairo_surface_status(moving_img->img)));
+	moving_img = malloc(NUM_MOVING_IMG*sizeof(struct moving_image));
+	moving_img_timeout = calloc(sizeof(struct ev_timer), 1);
+	if(moving_img != NULL && moving_img_timeout != NULL) {
+	  ev_init(moving_img_timeout, redraw_moving_image_timeout);
+	  moving_img_timeout->repeat = TSTAMP_N_SECS(0.04);
+	  
+	  for(int i=0; i<NUM_MOVING_IMG; i++) {
+	    if(!verify_png_image(moving_img_path[i])) {
+	      fprintf(stderr, "Could not load moving image \"%s\n", moving_img_path[i]);
+	      free(moving_img);
 	      moving_img = NULL;
+	      free(moving_img_timeout);
+	      moving_img_timeout = NULL;
+	      break;
 	    }
-	    moving_img->x = 200;
-	    moving_img->y = 300;
-	    moving_img->move_start_time = clock();
-	    moving_img_timeout = calloc(sizeof(struct ev_timer), 1);
-	    ev_init(moving_img_timeout, redraw_moving_image_timeout);
-	    moving_img_timeout->repeat = TSTAMP_N_SECS(0.04);
+	    moving_img[i].img = cairo_image_surface_create_from_png(moving_img_path[i]);
+	    if (cairo_surface_status(moving_img[i].img) != CAIRO_STATUS_SUCCESS) {
+	      fprintf(stderr, "Could not load moving image \"%s\": %s\n",
+		      moving_img_path[i], cairo_status_to_string(cairo_surface_status(moving_img[i].img)));
+	      free(moving_img);
+	      moving_img = NULL;
+	      free(moving_img_timeout);
+	      moving_img_timeout = NULL;
+	      break;
+	    }
+	    moving_img[i].moving = false;
+	    moving_img[i].x = moving_img_default_pos[i*2];
+	    moving_img[i].y = moving_img_default_pos[i*2+1];
 	  }
 	}
-
     }
 
     free(image_path);
